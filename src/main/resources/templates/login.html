@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Вход через OAuth2</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f5f5f5;
+    }
+    .login-container {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      text-align: center;
+      width: 300px;
+    }
+    .oauth-btn {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+    }
+    .google-btn { background: #DB4437; }
+    .github-btn { background: #333; }
+    .facebook-btn { background: #4267B2; }
+    .profile-link {
+      display: none;
+      margin-top: 20px;
+      color: #2c3e50;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+<div class="login-container">
+  <h2>Вход в систему</h2>
+
+  <!-- Кнопки OAuth2 -->
+  <a href="/oauth2/authorize/google" class="oauth-btn google-btn">
+    Войти через Google
+  </a>
+  <a href="/oauth2/authorize/github" class="oauth-btn github-btn">
+    Войти через GitHub
+  </a>
+  <a href="/oauth2/authorize/facebook" class="oauth-btn facebook-btn">
+    Войти через Facebook
+  </a>
+
+  <!-- Ссылка на профиль (показывается после входа) -->
+  <a href="/profile" class="profile-link" id="profileLink">
+    Перейти в профиль →
+  </a>
+</div>
+
+<script>
+  // Проверяем статус аутентификации при загрузке
+  fetch('/api/auth/check')
+          .then(response => response.json())
+          .then(data => {
+            if (data.authenticated) {
+              document.getElementById('profileLink').style.display = 'block';
+            }
+          });
+</script>
+</body>
+</html>

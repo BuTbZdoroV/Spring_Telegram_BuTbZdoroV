@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.0/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+        }
+        .chat-header {
+            background: #4285f4;
+            color: white;
+            padding: 15px;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: white;
+            border-left: 1px solid #ddd;
+            border-right: 1px solid #ddd;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            background: #f8f9fa;
+            max-width: 70%;
+        }
+        .message.system {
+            background: #e9ecef;
+            text-align: center;
+            margin: 10px auto;
+            max-width: 90%;
+            font-style: italic;
+        }
+        .message.sent {
+            margin-left: auto;
+            background: #e3f2fd;
+        }
+        .message-info {
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .message-content {
+            word-wrap: break-word;
+        }
+        .chat-input {
+            display: flex;
+            padding: 15px;
+            background: white;
+            border-radius: 0 0 8px 8px;
+            border: 1px solid #ddd;
+            border-top: none;
+        }
+        #messageInput {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        #sendButton {
+            padding: 10px 20px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #sendButton:hover {
+            background: #357abd;
+        }
+        .user-avatar {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+        .logout-btn:hover {
+            background: #c0392b;
+        }
+    </style>
+</head>
+<body>
+<div class="chat-container">
+    <div class="chat-header">
+        <div>
+            <img id="currentUserAvatar" class="user-avatar" src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png">
+            <span id="currentUserName">Пользователь</span>
+        </div>
+        <button class="logout-btn" onclick="logout()">Выйти</button>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+        <!-- Сообщения будут добавляться здесь -->
+    </div>
+
+    <div class="chat-input">
+        <input type="text" id="messageInput" placeholder="Введите сообщение...">
+        <button id="sendButton" onclick="sendMessage()">Отправить</button>
+    </div>
+</div>
+
+<script>
+    // Подключение к WebSocket
+    let socket;
+    let stompClient;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    const RECONNECT_DELAY = 5000; // 5 секунд
+
+    // Текущий пользователь
+    let currentUser = {
+        name: 'Гость',
+        imageUrl: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'
+    };
+
+    // Инициализация приложения
+    function init() {
+        fetchUserData();
+        setupMessageInput();
+    }
+
+    // Загрузка данных пользователя
+    function fetchUserData() {
+        fetch('/user')
+            .then(response => {
+                if (!response.ok) throw new Error('Не авторизован');
+                return response.json();
+            })
+            .then(user => {
+                currentUser = {
+                    name: user.name || user.email.split('@')[0],
+                    imageUrl: user.imageUrl || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'
+                };
+
+                document.getElementById('currentUserName').textContent = currentUser.name;
+                document.getElementById('currentUserAvatar').src = currentUser.imageUrl;
+
+                connectToChat();
+                loadChatHistory();
+            })
+            .catch(error => {
+                console.error('Ошибка загрузки данных:', error);
+                window.location.href = '/login';
+            });
+    }
+
+    // Подключение к чату
+    function connectToChat() {
+        socket = new SockJS('/ws');
+        stompClient = Stomp.over(socket);
+
+        // Настройка heartbeat
+        stompClient.heartbeat.outgoing = 10000; // 10 секунд
+        stompClient.heartbeat.incoming = 10000; // 10 секунд
+
+        stompClient.connect({}, onConnect, onError);
+    }
+
+    function onConnect() {
+        console.log('Успешное подключение к WebSocket');
+        reconnectAttempts = 0;
+
+        // Подписка на сообщения
+        stompClient.subscribe('/topic/chat', (message) => {
+            try {
+                const msg = JSON.parse(message.body);
+                displayMessage(msg);
+            } catch (e) {
+                console.error('Ошибка обработки сообщения:', e);
+            }
+        });
+
+        // Уведомление о подключении
+        if (stompClient.connected) {
+            stompClient.send("/app/chat.join", {}, JSON.stringify({}));
+        }
+    }
+
+    function onError(error) {
+        console.error('Ошибка WebSocket:', error);
+        attemptReconnect();
+    }
+
+    function attemptReconnect() {
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttempts++;
+            console.log(`Попытка переподключения #${reconnectAttempts} через ${RECONNECT_DELAY/1000} сек...`);
+            setTimeout(connectToChat, RECONNECT_DELAY);
+        } else {
+            console.error('Превышено максимальное количество попыток переподключения');
+        }
+    }
+
+    // Загрузка истории сообщений
+    function loadChatHistory() {
+        fetch('/chat/history')
+            .then(response => {
+                if (!response.ok) throw new Error('Ошибка загрузки истории');
+                return response.json();
+            })
+            .then(messages => {
+                messages.forEach(msg => displayMessage(msg));
+                scrollToBottom();
+            })
+            .catch(error => console.error('Ошибка загрузки истории:', error));
+    }
+
+    // Отображение сообщения
+    function displayMessage(msg) {
+        const chat = document.getElementById('chatMessages');
+        const messageDiv = document.createElement('div');
+
+        if (msg.type === 'SYSTEM') {
+            messageDiv.className = 'message system';
+            messageDiv.innerHTML = `<div class="message-content">${msg.content}</div>`;
+        } else {
+            const isCurrentUser = msg.senderName === currentUser.name;
+            messageDiv.className = isCurrentUser ? 'message sent' : 'message';
+
+            messageDiv.innerHTML = `
+            <div class="message-info">
+                <img src="${msg.senderImage || 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'}"
+                     class="user-avatar" alt="${msg.senderName}">
+                <strong>${msg.senderName}</strong>
+                <small>${formatTimestamp(msg.timestamp)}</small>
+            </div>
+            <div class="message-content">${msg.content}</div>
+        `;
+        }
+
+        chat.appendChild(messageDiv);
+        scrollToBottom();
+    }
+
+    function formatTimestamp(timestamp) {
+        if (!timestamp) return '';
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString();
+    }
+
+    function scrollToBottom() {
+        const chat = document.getElementById('chatMessages');
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    // Настройка ввода сообщений
+    function setupMessageInput() {
+        const input = document.getElementById('messageInput');
+        input.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+    }
+
+    // Отправка сообщения
+    function sendMessage() {
+        const input = document.getElementById('messageInput');
+        const content = input.value.trim();
+
+        if (content && stompClient && stompClient.connected) {
+            const message = {
+                content: content,
+                type: 'TEXT',
+                senderId: currentUser.id, // Добавьте это поле
+                senderName: currentUser.name,
+                senderImage: currentUser.imageUrl
+            };
+
+            stompClient.send("/app/chat.send", {}, JSON.stringify(message));
+            input.value = '';
+        } else if (!stompClient.connected) {
+            console.error('Не подключено к чату');
+            attemptReconnect();
+        }
+        stompClient.send("/app/chat.send", {}, JSON.stringify(message), (response) => {
+            if (response.body === "BLOCKED") {
+                showWarning("Сообщение не отправлено: содержит запрещённые слова");
+            }
+        });
+    }
+
+    function showWarning(message) {
+        stompClient.subscribe('/user/queue/warnings', (message) => {
+            const warning = JSON.parse(message.body);
+            alert(warning.content); // или красивый toast-уведомление
+        });
+    }
+
+    // Выход из системы
+    function logout() {
+        if (stompClient && stompClient.connected) {
+            stompClient.disconnect();
+        }
+
+        fetch('/logout', { method: 'POST' })
+            .then(() => window.location.href = '/login')
+            .catch(error => console.error('Ошибка выхода:', error));
+    }
+
+    // Инициализация при загрузке страницы
+    window.onload = init;
+</script>
+</body>
+</html>
