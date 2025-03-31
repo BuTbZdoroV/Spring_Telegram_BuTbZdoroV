@@ -7,14 +7,18 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.zxcchatbutb.config.authinfo.PersonPrincipal;
+import org.zxcchatbutb.model.DTO.ChatDTO;
+import org.zxcchatbutb.model.DTO.PersonDTO;
 import org.zxcchatbutb.model.chat.Chat;
 import org.zxcchatbutb.model.chat.ChatMember;
 import org.zxcchatbutb.model.user.Person;
+import org.zxcchatbutb.repository.ChatMemberRepository;
 import org.zxcchatbutb.repository.ChatRepository;
 import org.zxcchatbutb.repository.MessageRepository;
 import org.zxcchatbutb.repository.PersonRepository;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +26,7 @@ public class ChatService {
 
     private final PersonRepository personRepository;
     private final ChatRepository chatRepository;
+    private final ChatMemberRepository chatMemberRepository;
     private final MessageRepository messageRepository;
 
 
@@ -31,15 +36,22 @@ public class ChatService {
             return ResponseEntity.badRequest().build();
         }
 
+        Person owner = personRepository.findById(person.getId()).orElseThrow(() -> new RuntimeException("Авторизованный пользователь не найден"));
+
         Chat newPublicChat = new Chat();
         newPublicChat.setChatName(chatName);
-        newPublicChat.setOwner(personRepository.findById(person.getId()).orElseThrow(() -> new RuntimeException("Авторизованный пользователь не найден")));
+        newPublicChat.setOwner(owner);
         newPublicChat.setType(Chat.ChatType.PUBLIC);
 
         chatRepository.save(newPublicChat);
-        return ResponseEntity.ok(newPublicChat);
+
+        ChatMember chatMember = new ChatMember(owner, newPublicChat, ChatMember.ChatRole.ADMIN);
+        chatMemberRepository.save(chatMember);
+
+        return ResponseEntity.ok(ChatDTO.toDTO(newPublicChat, ChatDTO.ConvertLevel.HIGH));
     }
 
+    @Transactional
     public ResponseEntity<?> createPrivateChat(PersonPrincipal person1Principal, Long person2ID) {
 
         Person person1 = personRepository.findById(person1Principal.getId()).orElse(null);
@@ -67,7 +79,17 @@ public class ChatService {
         return chat;
     }
 
+    public ResponseEntity<?> getChats(PersonPrincipal person) {
+        List<ChatDTO> chatDTOList = chatMemberRepository.findChatsByPersonId(person.getId()).stream().map(chat -> ChatDTO.toDTO(chat, ChatDTO.ConvertLevel.HIGH)).toList();
+        System.out.println(chatDTOList.toString());
+        return ResponseEntity.ok(chatDTOList);
+    }
 
+    public ResponseEntity<?> getPersonPrincipalData(PersonPrincipal person) {
+        Person person1 = personRepository.findByIdWithAllRelations(person.getId()).orElse(null);
+        PersonDTO personDTO = PersonDTO.toDTO(person1, PersonDTO.ConvertLevel.HIGH);
+        return ResponseEntity.ok(personDTO);
+    }
 
 
 }

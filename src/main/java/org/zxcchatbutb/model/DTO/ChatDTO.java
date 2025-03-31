@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.zxcchatbutb.model.chat.Chat;
+import org.zxcchatbutb.model.chat.ChatMember;
+import org.zxcchatbutb.model.user.Person;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +40,7 @@ public class ChatDTO {
                 chatDTO.setAvatarUrl(chat.getAvatarUrl());
                 chatDTO.setType(chat.getType());
                 chatDTO.setOwner(PersonDTO.toDTO(chat.getOwner(), PersonDTO.ConvertLevel.MEDIUM));
-                chatDTO.setMembers(chat.getMembers().stream().map(chatMember -> PersonDTO.toDTO(chatMember.getPerson(), chatMember ,PersonDTO.ConvertLevel.MEDIUM)).collect(Collectors.toList()));
+                chatDTO.setMembers(chat.getMembers().stream().map(chatMember -> PersonDTO.toDTO(chatMember.getPerson() ,PersonDTO.ConvertLevel.MEDIUM)).collect(Collectors.toList()));
                 chatDTO.setMessages(chat.getMessages().stream().map(chatMessage -> MessageDTO.toDTO(chatMessage, MessageDTO.ConvertLevel.MEDIUM)).collect(Collectors.toList()));
             }
             case HIGH -> {
@@ -47,12 +49,25 @@ public class ChatDTO {
                 chatDTO.setAvatarUrl(chat.getAvatarUrl());
                 chatDTO.setType(chat.getType());
                 chatDTO.setOwner(PersonDTO.toDTO(chat.getOwner(), PersonDTO.ConvertLevel.MEDIUM));
-                chatDTO.setMembers(chat.getMembers().stream().map(chatMember -> PersonDTO.toDTO(chatMember.getPerson(), chatMember, PersonDTO.ConvertLevel.MEDIUM)).collect(Collectors.toList()));
+                chatDTO.setMembers(chat.getMembers().stream().map(chatMember -> PersonDTO.toDTO(chatMember.getPerson(), PersonDTO.ConvertLevel.MEDIUM)).collect(Collectors.toList()));
                 chatDTO.setMessages(chat.getMessages().stream().map(chatMessage -> MessageDTO.toDTO(chatMessage, MessageDTO.ConvertLevel.HIGH)).collect(Collectors.toList()));
             }
         }
 
         return chatDTO;
+    }
+
+    @Override
+    public String toString() {
+        return "ChatDTO{" +
+                "id=" + id +
+                ", chatName='" + chatName + '\'' +
+                ", avatarUrl='" + avatarUrl + '\'' +
+                ", type=" + type +
+                ", members=" + members +
+                ", messages=" + messages +
+                ", owner=" + owner +
+                '}';
     }
 
     public enum ConvertLevel {

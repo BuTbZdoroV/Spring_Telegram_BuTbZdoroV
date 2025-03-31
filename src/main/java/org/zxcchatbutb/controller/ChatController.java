@@ -3,14 +3,12 @@ package org.zxcchatbutb.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.zxcchatbutb.config.authinfo.PersonPrincipal;
 import org.zxcchatbutb.service.ChatService;
 
-@RestController("/chat")
+@RestController
+@RequestMapping("/chat")
 @RequiredArgsConstructor
 public class ChatController {
 
@@ -24,6 +22,16 @@ public class ChatController {
     @PostMapping("/createPrivateChat/{person2Id}")
     public ResponseEntity<?> createPrivateChat(@AuthenticationPrincipal PersonPrincipal person, @PathVariable Long person2Id) {
         return chatService.createPrivateChat(person, person2Id);
+    }
+
+    @GetMapping("/getChats")
+    public ResponseEntity<?> getChats(@AuthenticationPrincipal PersonPrincipal person) {
+        return chatService.getChats(person);
+    }
+
+    @GetMapping("/getPersonPrincipalData")
+    public ResponseEntity<?> getPersonPrincipalData(@AuthenticationPrincipal PersonPrincipal person) {
+        return chatService.getPersonPrincipalData(person);
     }
 
 }

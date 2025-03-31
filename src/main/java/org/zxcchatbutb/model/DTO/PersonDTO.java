@@ -72,7 +72,6 @@ public class PersonDTO {
             }
         }
 
-
         return personDTO;
     }
 

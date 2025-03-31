@@ -11,13 +11,6 @@ import org.zxcchatbutb.service.PersonDetailsService;
 @RestController
 public class PersonController {
 
-    private final PersonDetailsService personDetailsService;
-
-    public PersonController(PersonDetailsService personDetailsService) {
-        this.personDetailsService = personDetailsService;
-    }
-
-
     @GetMapping("/login-success")
     public String loginSuccess() {
         return "Login successful!";
@@ -28,9 +21,5 @@ public class PersonController {
         return "Login failed!";
     }
 
-    @GetMapping("/user")
-    public ResponseEntity<Person> getCurrentUser(@AuthenticationPrincipal PersonPrincipal principal) {
-        return personDetailsService.getPerson(principal);
-    }
 
 }
