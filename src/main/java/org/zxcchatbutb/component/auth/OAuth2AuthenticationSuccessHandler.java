@@ -16,6 +16,6 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
                                         HttpServletResponse response,
                                         Authentication authentication) throws IOException {
 
-        response.sendRedirect("/oauth2/profile");
+        response.sendRedirect("/");
     }
 }

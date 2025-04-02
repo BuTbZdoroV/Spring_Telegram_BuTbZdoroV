@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.zxcchatbutb.model.user.Person;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 @Entity
 @Data
@@ -17,10 +18,10 @@ public class ChatMember {
     @GeneratedValue
     private Long id;
 
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "person_id")
     private Person person;
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "chat_id")
     private Chat chat;
 
@@ -42,5 +43,16 @@ public class ChatMember {
         USER, ADMIN
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        ChatMember that = (ChatMember) o;
+        return Objects.equals(id, that.id) && Objects.equals(person, that.person) && Objects.equals(chat, that.chat);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, person, chat);
+    }
 }
 

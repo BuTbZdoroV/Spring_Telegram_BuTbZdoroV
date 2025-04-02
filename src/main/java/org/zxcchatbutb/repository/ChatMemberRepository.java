@@ -8,6 +8,7 @@ import org.zxcchatbutb.model.chat.ChatMember;
 import org.zxcchatbutb.model.user.Person;
 
 import java.util.List;
+import java.util.Set;
 
 public interface ChatMemberRepository extends JpaRepository<ChatMember, Long> {
     
@@ -24,4 +25,9 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, Long> {
     // Вариант с получением только чатов
     @Query("SELECT cm.chat FROM ChatMember cm WHERE cm.person.id = :personId")
     List<Chat> findChatsByPersonId(@Param("personId") Long personId);
+
+    Set<ChatMember> findChatMemberByPerson(Person person);
+
+    Boolean existsByPersonIdAndChatId(Long personId, Long chatId);
+
 }

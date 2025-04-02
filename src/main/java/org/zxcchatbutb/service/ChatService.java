@@ -18,6 +18,7 @@ import org.zxcchatbutb.repository.MessageRepository;
 import org.zxcchatbutb.repository.PersonRepository;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -79,12 +80,15 @@ public class ChatService {
         return chat;
     }
 
+    @Transactional(readOnly = true)
     public ResponseEntity<?> getChats(PersonPrincipal person) {
-        List<ChatDTO> chatDTOList = chatMemberRepository.findChatsByPersonId(person.getId()).stream().map(chat -> ChatDTO.toDTO(chat, ChatDTO.ConvertLevel.HIGH)).toList();
-        System.out.println(chatDTOList.toString());
-        return ResponseEntity.ok(chatDTOList);
+        List<Chat> chatList = chatMemberRepository.findChatsByPersonId(person.getId());
+        List<ChatDTO> chatDTOS = chatList.stream().map(chatMember -> ChatDTO.toDTO(chatMember, ChatDTO.ConvertLevel.HIGH)).collect(Collectors.toList());
+        System.out.println(chatDTOS.toString());
+        return ResponseEntity.ok(chatDTOS);
     }
 
+    @Transactional(readOnly = true)
     public ResponseEntity<?> getPersonPrincipalData(PersonPrincipal person) {
         Person person1 = personRepository.findByIdWithAllRelations(person.getId()).orElse(null);
         PersonDTO personDTO = PersonDTO.toDTO(person1, PersonDTO.ConvertLevel.HIGH);

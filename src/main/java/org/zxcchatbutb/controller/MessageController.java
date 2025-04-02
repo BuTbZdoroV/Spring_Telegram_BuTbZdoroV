@@ -9,6 +9,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.zxcchatbutb.config.authinfo.PersonPrincipal;
+import org.zxcchatbutb.model.DTO.ChatJoinRequest;
+import org.zxcchatbutb.model.DTO.MessageDTO;
 import org.zxcchatbutb.model.chat.Message;
 import org.zxcchatbutb.service.MessageService;
 
@@ -32,14 +34,14 @@ public class MessageController {
     }
 
     @MessageMapping("/chat.join")
-    public String handleUserJoin(Principal principal) {
+    public String handleUserJoin(Principal principal, @Payload ChatJoinRequest chatJoinRequest) {
         PersonPrincipal userPrincipal = (PersonPrincipal) ((Authentication) principal).getPrincipal();
-        return messageService.handleUserJoin(userPrincipal);
+        return messageService.handleUserJoin(userPrincipal, chatJoinRequest);
     }
 
     @GetMapping("/chat/history")
     @ResponseBody
-    public List<Message> getChatHistory() {
+    public List<MessageDTO> getChatHistory() {
         return messageService.getChatHistory();
     }
 

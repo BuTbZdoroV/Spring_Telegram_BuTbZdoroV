@@ -63,7 +63,7 @@
 
     // Получение данных пользователя
     function getUserData() {
-        axios.get('/getPersonPrincipalData')
+        axios.get('/chat/getPersonPrincipalData')
             .then(response => {
                 document.getElementById('userInfo').innerHTML =
                     `<pre>${JSON.stringify(response.data, null, 2)}</pre>`;
@@ -109,7 +109,6 @@
             });
     }
 
-    // Подключение к чату через WebSocket
     function connectToChat() {
         const chatId = document.getElementById('chatIdInput').value;
         currentChatId = chatId;
@@ -121,42 +120,42 @@
         const socket = new SockJS('/ws');
         stompClient = Stomp.over(socket);
 
-        stompClient.connect({}, function(frame) {
+        stompClient.connect({}, (frame) => {
             console.log('Connected: ' + frame);
 
-            // Подписываемся на получение сообщений
-            stompClient.subscribe(`/topic/chat/${chatId}`, function(message) {
+            // Подписка на конкретный чат
+            stompClient.subscribe(`/topic/chat.${chatId}`, (message) => {
                 showMessage(JSON.parse(message.body));
             });
 
-            // Отправляем сообщение о подключении
-            stompClient.send("/app/chat.join", {}, JSON.stringify({
-                chatId: chatId
-            }));
+            // Отправка запроса на подключение с DTO
+            const joinRequest = {
+                chatId: Number(chatId)
+            };
+            stompClient.send("/app/chat.join", {}, JSON.stringify(joinRequest));
 
-            // Загружаем историю чата
+            // Загрузка истории с параметром chatId
             axios.get(`/chat/history?chatId=${chatId}`)
                 .then(response => {
                     response.data.forEach(msg => showMessage(msg));
+                    scrollChat();
                 })
-                .catch(error => {
-                    console.error('Error fetching chat history:', error);
-                });
+                .catch(handleError);
         });
     }
 
-    // Отправка сообщения
+    // Обновленная функция отправки сообщения
     function sendMessage() {
-        if (stompClient === null || currentChatId === null) {
-            alert('Please connect to a chat first');
+        if (!stompClient || !currentChatId) {
+            alert('Сначала подключитесь к чату');
             return;
         }
 
-        const messageText = document.getElementById('messageInput').value;
-        if (messageText.trim() === '') return;
+        const messageText = document.getElementById('messageInput').value.trim();
+        if (!messageText) return;
 
         const message = {
-            chatId: currentChatId,
+            chatId: Number(currentChatId),
             content: messageText,
             type: 'TEXT'
         };
@@ -165,18 +164,36 @@
         document.getElementById('messageInput').value = '';
     }
 
-    // Отображение сообщения
+    // Обновленное отображение сообщений
     function showMessage(message) {
         const chatHistory = document.getElementById('chatHistory');
         const messageElement = document.createElement('div');
         messageElement.className = 'message';
+
         messageElement.innerHTML = `
-                <strong>${message.sender?.name || 'System'}:</strong>
-                <span>${message.content}</span>
-                <small>${new Date(message.createAt).toLocaleString()}</small>
-            `;
+            <strong>${message.senderName || 'System'}:</strong>
+            <span>${message.content}</span>
+            <small>${new Date(message.sendAt).toLocaleString()}</small>
+        `;
+
         chatHistory.appendChild(messageElement);
+        scrollChat();
+    }
+
+    // Автоскролл к новым сообщениям
+    function scrollChat() {
+        const chatHistory = document.getElementById('chatHistory');
         chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    // Обработка ошибок
+    function handleError(error) {
+        console.error('Error:', error);
+        if (error.response) {
+            alert(`Error: ${error.response.data}`);
+        } else {
+            alert('Network error');
+        }
     }
 </script>
 </body>
