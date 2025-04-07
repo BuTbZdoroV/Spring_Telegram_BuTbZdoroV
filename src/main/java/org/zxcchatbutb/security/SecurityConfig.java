@@ -9,6 +9,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtDecoders;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.zxcchatbutb.component.auth.OAuth2AuthenticationFailureHandler;
 import org.zxcchatbutb.component.auth.OAuth2AuthenticationSuccessHandler;
 import org.zxcchatbutb.service.GoogleOAuthUserService;
@@ -45,7 +46,11 @@ public class SecurityConfig {
                         .failureHandler(oAuth2AuthenticationFailureHandler)
                 )
                 .logout(logout -> logout
+                        .logoutUrl("/logout")
                         .logoutSuccessUrl("/")
+                        .addLogoutHandler(new SecurityContextLogoutHandler())
+                        .invalidateHttpSession(true)
+                        .deleteCookies("JSESSIONID")
                         .permitAll()
                 );
 

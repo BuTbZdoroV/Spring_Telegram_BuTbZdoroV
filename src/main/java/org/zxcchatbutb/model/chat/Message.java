@@ -33,7 +33,7 @@ public class Message {
 
     @ManyToOne()
     @JoinColumn(name = "chat_id")
-    private Chat chat;
+    private AbstractChat chat;
 
     public enum Status {
         SENDING,

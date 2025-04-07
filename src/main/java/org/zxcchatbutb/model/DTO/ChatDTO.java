@@ -2,59 +2,66 @@ package org.zxcchatbutb.model.DTO;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
-import org.zxcchatbutb.model.chat.Chat;
-import org.zxcchatbutb.model.chat.ChatMember;
-import org.zxcchatbutb.model.user.Person;
+import org.zxcchatbutb.model.chat.AbstractChat;
+import org.zxcchatbutb.model.chat.PrivateChat;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class ChatDTO {
+public class ChatDTO extends DTO {
 
     private Long id;
     private String chatName;
     private String avatarUrl;
-    private Chat.ChatType type;
+    private AbstractChat.ChatType type;
     private List<PersonDTO> members;
     private List<MessageDTO> messages;
     private PersonDTO owner;
 
 
-    public static ChatDTO toDTO(Chat chat, ConvertLevel convertLevel) {
+    public static Optional<ChatDTO> toDTO(AbstractChat abstractChat, ConvertLevel convertLevel) {
         ChatDTO chatDTO = new ChatDTO();
 
         switch (convertLevel) {
             case LOW -> {
-                chatDTO.setId(chat.getId());
-                chatDTO.setChatName(chat.getChatName());
-                chatDTO.setType(chat.getType());
+                chatDTO.setId(abstractChat.getId());
+                chatDTO.setChatName(abstractChat.getChatName());
+                chatDTO.setType(abstractChat.getChatType());
             }
             case MEDIUM -> {
-                chatDTO.setId(chat.getId());
-                chatDTO.setChatName(chat.getChatName());
-                chatDTO.setAvatarUrl(chat.getAvatarUrl());
-                chatDTO.setType(chat.getType());
-                chatDTO.setOwner(PersonDTO.toDTO(chat.getOwner(), PersonDTO.ConvertLevel.MEDIUM));
-                chatDTO.setMembers(chat.getMembers().stream().map(chatMember -> PersonDTO.toDTO(chatMember.getPerson() ,PersonDTO.ConvertLevel.MEDIUM)).collect(Collectors.toList()));
-                chatDTO.setMessages(chat.getMessages().stream().map(chatMessage -> MessageDTO.toDTO(chatMessage, MessageDTO.ConvertLevel.MEDIUM)).collect(Collectors.toList()));
+                chatDTO.setId(abstractChat.getId());
+                chatDTO.setChatName(abstractChat.getChatName());
+                chatDTO.setType(abstractChat.getChatType());
+                chatDTO.setMembers(abstractChat.getMembers().stream().map(chatMember -> PersonDTO.toDTO(chatMember.getPerson(), PersonDTO.ConvertLevel.MEDIUM).orElse(null)).collect(Collectors.toList()));
+                chatDTO.setMessages(abstractChat.getMessages().stream().map(chatMessage -> MessageDTO.toDTO(chatMessage, MessageDTO.ConvertLevel.MEDIUM).orElse(null)).collect(Collectors.toList()));
+
+                if (abstractChat.getChatType() != AbstractChat.ChatType.PRIVATE) {
+                    chatDTO.setOwner(PersonDTO.toDTO(abstractChat.getOwner(), PersonDTO.ConvertLevel.MEDIUM).orElse(null));
+                    chatDTO.setAvatarUrl(abstractChat.getAvatarUrl());
+                }
             }
             case HIGH -> {
-                chatDTO.setId(chat.getId());
-                chatDTO.setChatName(chat.getChatName());
-                chatDTO.setAvatarUrl(chat.getAvatarUrl());
-                chatDTO.setType(chat.getType());
-                chatDTO.setOwner(PersonDTO.toDTO(chat.getOwner(), PersonDTO.ConvertLevel.MEDIUM));
-                chatDTO.setMembers(chat.getMembers().stream().map(chatMember -> PersonDTO.toDTO(chatMember.getPerson(), PersonDTO.ConvertLevel.MEDIUM)).collect(Collectors.toList()));
-                chatDTO.setMessages(chat.getMessages().stream().map(chatMessage -> MessageDTO.toDTO(chatMessage, MessageDTO.ConvertLevel.HIGH)).collect(Collectors.toList()));
+                chatDTO.setId(abstractChat.getId());
+                chatDTO.setChatName(abstractChat.getChatName());
+                chatDTO.setType(abstractChat.getChatType());
+                chatDTO.setMembers(abstractChat.getMembers().stream().map(chatMember -> PersonDTO.toDTO(chatMember.getPerson(), PersonDTO.ConvertLevel.MEDIUM).orElse(null)).collect(Collectors.toList()));
+                chatDTO.setMessages(abstractChat.getMessages().stream().map(chatMessage -> MessageDTO.toDTO(chatMessage, MessageDTO.ConvertLevel.HIGH).orElse(null)).collect(Collectors.toList()));
+
+                if (abstractChat.getChatType() != AbstractChat.ChatType.PRIVATE) {
+                    chatDTO.setOwner(PersonDTO.toDTO(abstractChat.getOwner(), PersonDTO.ConvertLevel.MEDIUM).orElse(null));
+                    chatDTO.setAvatarUrl(abstractChat.getAvatarUrl());
+                }
             }
         }
 
-        return chatDTO;
+        return Optional.of(chatDTO);
     }
 
     @Override
@@ -68,10 +75,6 @@ public class ChatDTO {
                 ", messages=" + messages +
                 ", owner=" + owner +
                 '}';
-    }
-
-    public enum ConvertLevel {
-        LOW, MEDIUM, HIGH
     }
 
 }

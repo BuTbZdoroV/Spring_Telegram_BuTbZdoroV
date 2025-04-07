@@ -19,6 +19,10 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         registry.enableSimpleBroker("/topic", "/queue");
         registry.setApplicationDestinationPrefixes("/app");
     }
+    @Override
+    public void configureWebSocketTransport(WebSocketTransportRegistration registration) {
+        registration.setSendTimeLimit(15 * 1000).setSendBufferSizeLimit(512 * 1024);
+    }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {

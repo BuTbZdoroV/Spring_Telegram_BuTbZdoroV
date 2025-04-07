@@ -1,18 +1,16 @@
 package org.zxcchatbutb.model.chat;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import org.zxcchatbutb.model.user.Person;
 
 import java.util.*;
 
 @Entity
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
-public class Chat {
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn(name = "chat_type", discriminatorType = DiscriminatorType.STRING)
+public abstract class AbstractChat {
 
     @Id
     @GeneratedValue
@@ -22,7 +20,7 @@ public class Chat {
     private List<Message> messages = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "owner_id", nullable = false)
+    @JoinColumn(name = "owner_id")
     private Person owner;
 
     @OneToMany(mappedBy = "chat", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -30,9 +28,8 @@ public class Chat {
 
     private String chatName;
     private String avatarUrl;
-    private ChatType type;
 
-
+    public abstract ChatType getChatType();
 
     public boolean addMessage(Message message) {
         message.setChat(this);
@@ -50,8 +47,8 @@ public class Chat {
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
-        Chat chat = (Chat) o;
-        return Objects.equals(id, chat.id);
+        AbstractChat abstractChat = (AbstractChat) o;
+        return Objects.equals(id, abstractChat.id);
     }
 
     @Override

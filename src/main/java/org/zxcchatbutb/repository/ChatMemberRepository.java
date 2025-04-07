@@ -3,7 +3,7 @@ package org.zxcchatbutb.repository;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.zxcchatbutb.model.chat.Chat;
+import org.zxcchatbutb.model.chat.AbstractChat;
 import org.zxcchatbutb.model.chat.ChatMember;
 import org.zxcchatbutb.model.user.Person;
 
@@ -24,9 +24,11 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, Long> {
     
     // Вариант с получением только чатов
     @Query("SELECT cm.chat FROM ChatMember cm WHERE cm.person.id = :personId")
-    List<Chat> findChatsByPersonId(@Param("personId") Long personId);
+    List<AbstractChat> findChatsByPersonId(@Param("personId") Long personId);
 
     Set<ChatMember> findChatMemberByPerson(Person person);
+
+    List<ChatMember> findChatMemberByChat(AbstractChat chat);
 
     Boolean existsByPersonIdAndChatId(Long personId, Long chatId);
 

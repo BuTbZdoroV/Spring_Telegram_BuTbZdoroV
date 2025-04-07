@@ -23,7 +23,7 @@ public class ChatMember {
     private Person person;
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "chat_id")
-    private Chat chat;
+    private AbstractChat chat;
 
     private ChatRole role;
     private LocalDateTime joinedAt;
@@ -31,7 +31,7 @@ public class ChatMember {
 
     private boolean isMute;
 
-    public ChatMember(Person person, Chat chat, ChatRole role) {
+    public ChatMember(Person person, AbstractChat chat, ChatRole role) {
         this.person = person;
         this.chat = chat;
         this.role = role;
