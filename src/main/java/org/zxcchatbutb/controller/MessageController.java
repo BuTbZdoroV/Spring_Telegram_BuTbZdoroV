@@ -3,8 +3,10 @@ package org.zxcchatbutb.controller;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.messaging.handler.annotation.SendTo;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -30,18 +32,23 @@ public class MessageController {
         this.messageService = messageService;
     }
 
-    @MessageMapping("/chat.send")
-    public String send(@Valid @Payload MessageDTO message, Principal principal) {
+    @MessageMapping("/chat/{chatId}/send")
+    @SendTo("/topic/chat.{chatId}")
+    public MessageDTO send(@Valid @Payload MessageDTO message, Principal principal) {
         PersonPrincipal userPrincipal = (PersonPrincipal) ((Authentication) principal).getPrincipal();
         return messageService.send(message, userPrincipal);
     }
 
-    @MessageMapping("/chat.join")
-    public String handleUserJoin(Principal principal, @Payload ChatJoinRequest chatJoinRequest) {
-        PersonPrincipal userPrincipal = (PersonPrincipal) ((Authentication) principal).getPrincipal();
-        return messageService.handleUserJoin(userPrincipal, chatJoinRequest);
-    }
+  /*  @MessageMapping("/chat/{chatId}/userJoin")
+    @SendTo("/topic/chat/{chatId}")
+    public MessageDTO handleUserJoin(
+            @DestinationVariable Long chatId,
+            Principal principal) {
 
+        PersonPrincipal userPrincipal = (PersonPrincipal) ((Authentication) principal).getPrincipal();
+        return messageService.handleUserJoin(chatId, userPrincipal);
+    }
+*/
     @MessageMapping("/chat.status")
     public void handleMessageStatus(@Payload StatusUpdateDTO status) {
         messageService.handleMessageStatus(status);

@@ -940,32 +940,38 @@
 
     // WebSocket connection
     function initializeWebSocket() {
-        if (stompClient) stompClient.disconnect();
-        if (socket) socket.close();
+        if (stompClient) {
+            stompClient.disconnect();
+            stompClient = null;
+        }
+
+        if (socket) {
+            socket.close();
+            socket = null;
+        }
 
         console.log('Connecting WebSocket...');
         socket = new SockJS('/ws');
         stompClient = Stomp.over(socket);
 
-        stompClient.heartbeat.outgoing = 10000;
-        stompClient.heartbeat.incoming = 0;
-        stompClient.debug = () => {
+        // Отключаем debug-логи
+        stompClient.debug = () => {};
+
+        const headers = {
+            'userId': currentUser.id.toString()
         };
 
-        stompClient.connect({}, (frame) => {
-            console.log('Connected:', frame);
+        stompClient.connect(headers, (frame) => {
+            console.log('Successfully connected:', frame);
             reconnectAttempts = 0;
 
-            // Subscribe to user queue
-            stompClient.subscribe(`/queue/${currentUser.id}`, (message) => {
-                const msg = JSON.parse(message.body);
-                handleIncomingMessage(msg);
+            // Подписки
+            stompClient.subscribe(`/user/queue/${currentUser.id}`, (message) => {
+                handleIncomingMessage(JSON.parse(message.body));
             });
 
-            // Subscribe to updates
             stompClient.subscribe('/topic/updates', (message) => {
-                const update = JSON.parse(message.body);
-                handleSystemUpdate(update);
+                handleSystemUpdate(JSON.parse(message.body));
             });
 
             if (currentChat) {
@@ -973,35 +979,13 @@
             }
         }, (error) => {
             console.error('Connection error:', error);
-            handleDisconnection();
+            handleDisconnection(error);
         });
 
         socket.onclose = () => {
             console.log('WebSocket closed');
-            handleDisconnection();
+            handleDisconnection(new Error('WebSocket closed'));
         };
-    }
-
-    function handleDisconnection() {
-        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-            reconnectAttempts++;
-            const delay = RECONNECT_DELAY * reconnectAttempts;
-            console.log(`Reconnecting in ${delay / 1000}s (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
-            setTimeout(initializeWebSocket, delay);
-        } else {
-            showConnectionError();
-        }
-    }
-
-    function showConnectionError() {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'connection-error';
-        errorDiv.innerHTML = `
-            <div style="background: var(--tg-red); color: white; padding: 10px; text-align: center;">
-                Connection lost. Please <a href="#" onclick="window.location.reload()" style="color: white; text-decoration: underline;">refresh</a>.
-            </div>
-        `;
-        document.body.prepend(errorDiv);
     }
 
     // Chat functions
@@ -1070,11 +1054,68 @@
     }
 
     function joinChat(chatId) {
-        if (stompClient && stompClient.connected) {
-            stompClient.send("/app/chat.join", {}, JSON.stringify({
-                chatId: chatId
-            }));
+        if (!stompClient || !stompClient.connected || !chatId) return;
+
+        // 1. Отписываемся от предыдущей подписки
+        if (currentChat && currentChat.subscription) {
+            currentChat.subscription.unsubscribe();
         }
+
+        // 2. Подписываемся с ПРАВИЛЬНЫМ форматом топика (с точкой вместо слеша)
+        const topic = `/topic/chat.${chatId}`;  // Обратите внимание на точку!
+        currentChat.subscription = stompClient.subscribe(topic, (message) => {
+            const msg = JSON.parse(message.body);
+            if (msg.type === 'SYSTEM') {
+                showSystemMessage(msg.content);
+            } else {
+                addMessageToChat(msg);
+            }
+        });
+
+        // 3. Отправляем уведомление о входе с правильным путем
+        stompClient.send(
+            `/app/chat/${chatId}/userJoin`,  // Путь с слешами
+            {},
+            JSON.stringify({})
+        );
+    }
+
+    function addMessageToChat(message) {
+        if (!currentChat || message.chat.id !== currentChat.id) return;
+
+        const isOutgoing = message.sender.id === currentUser.id;
+        const messageElement = document.createElement('div');
+        messageElement.className = `message ${isOutgoing ? 'message-out' : 'message-in'}`;
+
+        let attachmentsHtml = '';
+        if (message.attachments && message.attachments.length > 0) {
+            attachmentsHtml = message.attachments.map(attachment => {
+                if (attachment.fileType.startsWith('image/')) {
+                    return `<img src="${attachment.url}" style="max-width: 100%; border-radius: 8px; margin-top: 8px;">`;
+                } else {
+                    return `<div style="margin-top: 8px;">
+                    <a href="${attachment.url}" target="_blank">${attachment.fileName || 'Download file'}</a>
+                </div>`;
+                }
+            }).join('');
+        }
+
+        messageElement.innerHTML = `
+        ${!isOutgoing ? `<div class="message-sender">${message.sender.name}</div>` : ''}
+        <div class="message-text">${message.content}</div>
+        ${attachmentsHtml}
+        <div class="message-time">${formatTime(message.sendAt)}</div>
+    `;
+
+        messagesContainer.appendChild(messageElement);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function showSystemMessage(text) {
+        const messageElement = document.createElement('div');
+        messageElement.className = 'system-message';
+        messageElement.textContent = text;
+        messagesContainer.appendChild(messageElement);
     }
 
     function loadChatHistory(chatId) {
@@ -1195,125 +1236,81 @@
             });
     }
 
-    async function sendMessage() {
-        const text = messageInput.value.trim();
-        if ((!text && attachments.length === 0) || !currentChat) return;
+    function sendMessage() {
+        if (!stompClient || !stompClient.connected || !currentChat) return;
 
-        // Создаем базовый объект сообщения
+        const text = messageInput.value.trim();
+        if (!text && attachments.length === 0) return;
+
         const message = {
             content: text,
-            sendAt: new Date().toISOString(),
-            type: "TEXT",
-            chat: {
-                id: currentChat.id
-            },
-            attachments: []
+            chat: { id: currentChat.id },
+            type: attachments.length > 0 ? "MEDIA" : "TEXT",
+            attachments: attachments.map(file => ({
+                fileName: file.name,
+                fileType: file.type
+            }))
         };
 
-        // Если есть вложения, добавляем их в сообщение
-        if (attachments.length > 0) {
-            // В реальном приложении вам нужно загрузить файлы на сервер и получить их URL
-            // Здесь просто пример структуры
-            message.attachments = attachments.map(file => ({
-                url: URL.createObjectURL(file), // В реальном приложении это будет URL с сервера
-                fileType: file.type,
-                fileName: file.name
-            }));
+        // Добавляем обязательный заголовок destination
+        const headers = {
+            'destination': `/app/chat/${currentChat.id}/send`
+        };
 
-            // Если тип сообщения с вложениями - можно установить другой тип
-            message.type = "MEDIA";
-        }
+        stompClient.send(
+            headers.destination, // Путь
+            headers,            // Заголовки
+            JSON.stringify(message) // Тело
+        );
 
-        if (stompClient && stompClient.connected) {
-            stompClient.send("/app/chat.send", {}, JSON.stringify(message));
-
-            // Optimistic update
-            const optimisticMessage = {
-                content: text,
-                sendAt: new Date().toISOString(),
-                sender: {
-                    id: currentUser.id,
-                    name: currentUser.name
-                },
-                chat: {
-                    id: currentChat.id
-                },
-                attachments: message.attachments
-            };
-
-            handleIncomingMessage(optimisticMessage);
-        }
-
-        // Очищаем поля после отправки
+        // Очистка полей
         messageInput.value = '';
-        messageInput.style.height = 'auto';
         attachments = [];
-        fileInput.value = ''; // Сбрасываем input file
+        fileInput.value = '';
+    }
+
+    function handleDisconnection(error) {
+        console.error('WebSocket disconnected:', error);
+
+        if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            reconnectAttempts++;
+            const delay = RECONNECT_DELAY * reconnectAttempts;
+            console.log(`Reconnecting in ${delay/1000}s (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
+            setTimeout(initializeWebSocket, delay);
+        } else {
+            showConnectionError();
+        }
+    }
+
+    function showConnectionError() {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'connection-error';
+        errorDiv.innerHTML = `
+        <div style="background: var(--tg-red); color: white; padding: 10px; text-align: center;">
+            Connection lost. Please <a href="#" onclick="window.location.reload()">refresh</a>.
+        </div>
+    `;
+        document.body.prepend(errorDiv);
     }
 
     function handleIncomingMessage(message) {
-        // Обновляем текущий чат, если сообщение для него
-        if (currentChat && message.chat.id === currentChat.id) {
-            const isDuplicate = Array.from(messagesContainer.querySelectorAll('.message'))
-                .some(el => {
-                    const existingContent = el.querySelector('.message-text')?.textContent;
-                    const existingTime = el.querySelector('.message-time')?.textContent;
-                    return existingContent === message.content && existingTime === formatTime(message.sendAt);
-                });
+        // Проверяем, относится ли сообщение к текущему чату
+        if (!currentChat || message.chat.id !== currentChat.id) return;
 
-            if (!isDuplicate) {
-                const isOutgoing = message.sender.id === currentUser.id;
-                const messageElement = document.createElement('div');
-                messageElement.className = `message ${isOutgoing ? 'message-out' : 'message-in'}`;
+        const isOutgoing = message.sender?.id === currentUser.id;
+        const isSystem = message.type === 'SYSTEM';
 
-                let attachmentsHtml = '';
-                if (message.attachments && message.attachments.length > 0) {
-                    attachmentsHtml = message.attachments.map(attachment => {
-                        if (attachment.fileType.startsWith('image/')) {
-                            return `<img src="${attachment.url}" style="max-width: 100%; border-radius: 8px; margin-top: 8px;">`;
-                        } else {
-                            return `<div style="margin-top: 8px;">
-                            <a href="${attachment.url}" target="_blank">${attachment.fileName || 'Download file'}</a>
-                        </div>`;
-                        }
-                    }).join('');
-                }
+        const messageElement = document.createElement('div');
+        messageElement.className = `message ${isSystem ? 'system-message' : isOutgoing ? 'message-out' : 'message-in'}`;
 
-                messageElement.innerHTML = `
-                    ${!isOutgoing ? `<div class="message-sender">${message.sender.name}</div>` : ''}
-                    <div class="message-text">${message.content}</div>
-                    ${attachmentsHtml}
-                    <div class="message-time">${formatTime(message.sendAt)}</div>
-                `;
+        let content = isSystem
+            ? message.content
+            : `${!isOutgoing ? `<div class="message-sender">${message.sender.name}</div>` : ''}
+           <div class="message-text">${message.content}</div>`;
 
-                messagesContainer.appendChild(messageElement);
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
-            }
-        }
-
-        // Обновляем список чатов
-        const chatIndex = chats.findIndex(c => c.id === message.chat.id);
-        if (chatIndex !== -1) {
-            // Если чат найден, обновляем его последнее сообщение
-            const chat = chats[chatIndex];
-
-            // Создаем новый объект чата с обновленными данными
-            const updatedChat = {
-                ...chat,
-                messages: [message] // Заменяем все сообщения на новое (или добавляем к существующим)
-            };
-
-            // Обновляем массив чатов
-            chats[chatIndex] = updatedChat;
-
-            // Если это текущий чат, обновляем его тоже
-            if (currentChat && currentChat.id === updatedChat.id) {
-                currentChat = updatedChat;
-            }
-
-            // Перерисовываем список чатов
-            renderChatList();
-        }
+        messageElement.innerHTML = content;
+        messagesContainer.appendChild(messageElement);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
 
     function handleSystemUpdate(update) {
