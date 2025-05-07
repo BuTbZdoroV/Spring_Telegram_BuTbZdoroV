@@ -1,14 +1,15 @@
 package org.zxcchatbutb.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.zxcchatbutb.config.authinfo.PersonPrincipal;
 import org.zxcchatbutb.model.DTO.*;
-import org.zxcchatbutb.model.chat.Attachment;
-import org.zxcchatbutb.model.chat.AbstractChat;
-import org.zxcchatbutb.model.chat.Message;
+import org.zxcchatbutb.model.chat.*;
 import org.zxcchatbutb.model.user.Person;
 import org.zxcchatbutb.repository.*;
 
@@ -18,29 +19,21 @@ import java.util.List;
 
 @Slf4j
 @Service
+@RequiredArgsConstructor
 public class MessageService {
 
     private final MessageRepository messageRepository;
     private final PersonRepository personRepository;
-    private final RabbitTemplate rabbitTemplate;
+    private final SimpMessagingTemplate rabbitTemplate;
     private static final List<String> BAD_WORDS = List.of("хуй", "пизда", "ебан", "бля", "сука");
     private final ChatMemberRepository chatMemberRepository;
     private final ChatRepository chatRepository;
     private final AttachmentRepository attachmentRepository;
-
-
-    public MessageService(MessageRepository messageRepository, PersonRepository personRepository, RabbitTemplate rabbitTemplate, ChatMemberRepository chatMemberRepository, ChatRepository chatRepository, AttachmentRepository attachmentRepository) {
-        this.messageRepository = messageRepository;
-        this.personRepository = personRepository;
-        this.rabbitTemplate = rabbitTemplate;
-        this.chatMemberRepository = chatMemberRepository;
-        this.chatRepository = chatRepository;
-        this.attachmentRepository = attachmentRepository;
-    }
+    private final ContactRepository contactRepository;
 
 
     @Transactional
-    public MessageDTO send(MessageDTO message, PersonPrincipal principal) {
+    public ResponseEntity<?> send(MessageDTO message, PersonPrincipal principal) {
 
         Person sender = personRepository.findById(principal.getId()).orElseThrow();
         AbstractChat abstractChat = chatRepository.findById(message.getChat().getId())
@@ -51,8 +44,19 @@ public class MessageService {
             return null;
         }
 
-        if (containsBadWords(message.getContent())) {
-            return null;
+        if (abstractChat instanceof PrivateChat privateChat) {
+            Person receiver = personRepository.findById(privateChat.getPartner(principal).getId()).orElseThrow();
+
+            Contact contact = contactRepository.findContactBetweenPersons(sender, receiver).orElseThrow(() -> new RuntimeException("Contact not found"));
+
+            Contact.ContactPermissions contactPermissions = contact.getPermissionsFor(receiver);
+
+            if (!contactPermissions.isCanSendMessages()) {
+                System.out.println("Пользователь " + receiver.getName() + " запретил отправлять пользователю " + sender.getName() + " сообщения");
+                rabbitTemplate.convertAndSend(new ErrorMessageDTO(ErrorMessageDTO.ErrorCode.MESSAGE_BLOCK,
+                        "Пользователь " + receiver.getName() + " запретил отправлять пользователю " + sender.getName() + " сообщения",
+                        LocalDateTime.now()));
+            }
         }
 
         Message newMessage = new Message();
@@ -67,7 +71,7 @@ public class MessageService {
         attachmentRepository.saveAll(attachments);
         messageRepository.save(newMessage);
 
-        return MessageDTO.toDTO(newMessage, MessageDTO.ConvertLevel.HIGH).orElse(null);
+        return ResponseEntity.ok(MessageDTO.toDTO(newMessage, MessageDTO.ConvertLevel.HIGH).orElse(null));
     }
 
     private boolean containsBadWords(String text) {

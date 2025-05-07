@@ -12,6 +12,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.zxcchatbutb.config.authinfo.PersonPrincipal;
+import org.zxcchatbutb.exception.MessageSendingException;
 import org.zxcchatbutb.model.DTO.AttachmentDTO;
 import org.zxcchatbutb.model.DTO.ChatJoinRequest;
 import org.zxcchatbutb.model.DTO.MessageDTO;
@@ -20,6 +21,7 @@ import org.zxcchatbutb.model.chat.Message;
 import org.zxcchatbutb.service.MessageService;
 
 import java.security.Principal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -34,21 +36,11 @@ public class MessageController {
 
     @MessageMapping("/chat/{chatId}/send")
     @SendTo("/topic/chat.{chatId}")
-    public MessageDTO send(@Valid @Payload MessageDTO message, Principal principal) {
+    public ResponseEntity<?> send(@Valid @Payload MessageDTO message, Principal principal) {
         PersonPrincipal userPrincipal = (PersonPrincipal) ((Authentication) principal).getPrincipal();
         return messageService.send(message, userPrincipal);
     }
 
-  /*  @MessageMapping("/chat/{chatId}/userJoin")
-    @SendTo("/topic/chat/{chatId}")
-    public MessageDTO handleUserJoin(
-            @DestinationVariable Long chatId,
-            Principal principal) {
-
-        PersonPrincipal userPrincipal = (PersonPrincipal) ((Authentication) principal).getPrincipal();
-        return messageService.handleUserJoin(chatId, userPrincipal);
-    }
-*/
     @MessageMapping("/chat.status")
     public void handleMessageStatus(@Payload StatusUpdateDTO status) {
         messageService.handleMessageStatus(status);

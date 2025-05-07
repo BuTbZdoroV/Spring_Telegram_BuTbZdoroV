@@ -20,6 +20,7 @@ import org.zxcchatbutb.repository.MessageRepository;
 import org.zxcchatbutb.repository.PersonRepository;
 
 import java.util.List;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 @Service
@@ -94,9 +95,15 @@ public class ChatService {
             return ResponseEntity.badRequest().build();
         }
 
-        chat.getMembers().add(new ChatMember(person2, chat, ChatMember.ChatRole.USER));
+        ChatMember chatMember = new ChatMember(person2, chat, ChatMember.ChatRole.USER);
 
+        chat.getMembers().add(chatMember);
         chatRepository.save(chat);
+        person2.getChats().add(chatMember);
+        personRepository.save(person2);
+
+        System.out.println(person2.getChats().stream().map(chatMember1 -> chatMember1.getChat().getChatName()).collect(Collectors.toList()));
+        System.out.println(chat.getMembers().stream().map(chatMember1 -> chatMember1.getPerson().getName()).collect(Collectors.toList()));
         return ResponseEntity.ok("Пользователь " + person2.getName() + " добавлен в чат " + chat.getChatName());
 
     }

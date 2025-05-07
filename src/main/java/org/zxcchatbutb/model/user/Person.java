@@ -6,7 +6,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.zxcchatbutb.model.chat.ChatMember;
+import org.zxcchatbutb.model.chat.Contact;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
@@ -38,6 +40,12 @@ public class Person {
     @OneToMany(mappedBy = "person")
     private Set<ChatMember> chats;
 
+    @OneToMany(mappedBy = "contact")
+    private List<Contact> contacts;
+
+    @Embedded
+    private DefaultContactPolicy defaultContactPolicy;
+
     private String providerId;
     private String imageUrl;
 
@@ -61,6 +69,19 @@ public class Person {
         }
     }
 
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    @Embeddable
+    public static class DefaultContactPolicy {
+        private boolean allowMessages = true;  // Могут ли писать новые контакты
+        private boolean allowCalls = true;     // Могут ли звонить
+        private boolean allowAddingToChats = true; // Могут ли добавлять в чаты
+
+        private boolean showAvatar = true;
+        private boolean showPhoneNumber = false;
+        private boolean showLastSeen = true;
+    }
 
     @Override
     public boolean equals(Object o) {

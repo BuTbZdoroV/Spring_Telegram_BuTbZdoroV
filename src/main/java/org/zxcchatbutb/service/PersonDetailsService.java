@@ -12,10 +12,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import org.zxcchatbutb.config.authinfo.PersonPrincipal;
+import org.zxcchatbutb.model.DTO.ChatDTO;
+import org.zxcchatbutb.model.DTO.ContactDTO;
+import org.zxcchatbutb.model.DTO.DTO;
 import org.zxcchatbutb.model.DTO.PersonDTO;
 import org.zxcchatbutb.model.chat.ChatMember;
+import org.zxcchatbutb.model.chat.Contact;
+import org.zxcchatbutb.model.chat.PrivateChat;
 import org.zxcchatbutb.model.user.Person;
 import org.zxcchatbutb.repository.ChatMemberRepository;
+import org.zxcchatbutb.repository.ChatRepository;
+import org.zxcchatbutb.repository.ContactRepository;
 import org.zxcchatbutb.repository.PersonRepository;
 import org.zxcchatbutb.security.PersonDetails;
 
@@ -28,10 +35,14 @@ public class PersonDetailsService implements UserDetailsService {
 
     private final PersonRepository personRepository;
     private final ChatMemberRepository chatMemberRepository;
+    private final ContactRepository contactRepository;
+    private final ChatRepository chatRepository;
 
-    public PersonDetailsService(PersonRepository personRepository, ChatMemberRepository chatMemberRepository) {
+    public PersonDetailsService(PersonRepository personRepository, ChatMemberRepository chatMemberRepository, ContactRepository contactRepository, ChatRepository chatRepository) {
         this.personRepository = personRepository;
         this.chatMemberRepository = chatMemberRepository;
+        this.contactRepository = contactRepository;
+        this.chatRepository = chatRepository;
     }
 
     @Override
@@ -54,9 +65,12 @@ public class PersonDetailsService implements UserDetailsService {
         return ResponseEntity.ok(PersonDTO.toDTO(person, members, PersonDTO.ConvertLevel.HIGH).orElse(null));
     }
 
+
+
+
     public ResponseEntity<?> logout(HttpServletRequest request,
-                       HttpServletResponse response,
-                       OAuth2AuthenticationToken authentication) throws IOException {
+                                    HttpServletResponse response,
+                                    OAuth2AuthenticationToken authentication) throws IOException {
 
         // Стандартный выход из Spring Security
         new SecurityContextLogoutHandler().logout(request, response, authentication);
