@@ -40,6 +40,11 @@ public abstract class AbstractChat {
         return messages.remove(message);
     }
 
+    public Boolean personInMemberChat(Person person) {
+        if (person == null) return false;
+        return members.stream().map(ChatMember::getPerson).anyMatch(person::equals);
+    }
+
     public enum ChatType {
         PRIVATE, PUBLIC
     }

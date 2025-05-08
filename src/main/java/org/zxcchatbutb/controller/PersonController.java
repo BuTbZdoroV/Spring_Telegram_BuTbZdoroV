@@ -36,12 +36,17 @@ public class PersonController {
 
     @PostMapping("/createContact/{personTwoId}")
     public ResponseEntity<?> createContact(@AuthenticationPrincipal PersonPrincipal personOne, @PathVariable Long personTwoId) {
-        return contactService.createContact(personOne, personTwoId);
+        return contactService.createContactDTO(personOne, personTwoId);
     }
 
     @GetMapping("/findPersonByUsername/{username}")
     public ResponseEntity<PersonDTO> findPersonByUsername(@PathVariable String username) {
         return personDetailsService.getPersonByUsername(username);
+    }
+
+    @GetMapping("/findPersonIdByUsername/{username}")
+    public ResponseEntity<Long> findPersonIdByUsername(@PathVariable String username) {
+        return personDetailsService.getPersonIdByUsername(username);
     }
 
     @GetMapping("/getPersonPrincipalData")

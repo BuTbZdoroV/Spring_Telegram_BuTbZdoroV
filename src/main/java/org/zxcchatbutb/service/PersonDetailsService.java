@@ -55,7 +55,12 @@ public class PersonDetailsService implements UserDetailsService {
     public ResponseEntity<PersonDTO> getPersonByUsername(String username) {
         Person person = personRepository.findByName(username).orElseThrow(() -> new UsernameNotFoundException(username));
         return ResponseEntity.ok(PersonDTO.toDTO(person, PersonDTO.ConvertLevel.MEDIUM).orElse(null));
+    }
 
+    @Transactional(readOnly = true)
+    public ResponseEntity<Long> getPersonIdByUsername(String username) {
+        Person person = personRepository.findByName(username).orElseThrow(() -> new UsernameNotFoundException(username));
+        return ResponseEntity.ok(person.getId());
     }
 
     @Transactional(readOnly = true)

@@ -27,7 +27,7 @@ public class ContactService {
     private final ChatRepository chatRepository;
 
     @Transactional
-    public ResponseEntity<ContactDTO> getOrCreateContact(PersonPrincipal principal, Long personTwoId) {
+    public ResponseEntity<ContactDTO> getOrCreateContactDTO(PersonPrincipal principal, Long personTwoId) {
         Person personOne = personRepository.findById(principal.getId())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + principal.getId()));
         Person personTwo = personRepository.findById(personTwoId)
@@ -35,37 +35,49 @@ public class ContactService {
 
         Optional<Contact> existingContact = contactRepository.findContactBetweenPersons(personOne, personTwo);
 
-        if (existingContact.isPresent()) {
-            return ResponseEntity.ok(ContactDTO.toDTO(existingContact.get(), DTO.ConvertLevel.HIGH));
-        } else {
-            Contact newContact = new Contact(personOne, personTwo);
-            contactRepository.save(newContact);
+        return existingContact.map(contact -> ResponseEntity.ok(ContactDTO.toDTO(contact, DTO.ConvertLevel.HIGH))).orElseGet(() -> createContactDTO(principal, personTwoId));
 
-            return ResponseEntity.ok(ContactDTO.toDTO(newContact, DTO.ConvertLevel.HIGH));
-        }
+    }
 
+    @Transactional
+    public Contact getOrCreateContact(PersonPrincipal principal, Long personTwoId) {
+        Person personOne = personRepository.findById(principal.getId())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + principal.getId()));
+        Person personTwo = personRepository.findById(personTwoId)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with id: " + personTwoId));
+
+        Optional<Contact> existingContact = contactRepository.findContactBetweenPersons(personOne, personTwo);
+
+        return existingContact.orElseGet(() -> createContact(principal, personTwoId));
     }
 
 
     @Transactional
-    public ResponseEntity<ChatDTO> createContact(PersonPrincipal principal, Long personTwoId) {
+    public ResponseEntity<ContactDTO> createContactDTO(PersonPrincipal principal, Long personTwoId) {
         Person personOne = personRepository.findById(principal.getId()).orElseThrow(() -> new UsernameNotFoundException(principal.getName()));
         Person personTwo = personRepository.findById(personTwoId).orElseThrow(() -> new UsernameNotFoundException(principal.getName()));
         Contact contact = new Contact(personOne, personTwo);
 
-        personOne.getContacts().add(contact);
-        personTwo.getContacts().add(contact);
+        PrivateChat newPrivateChat = new PrivateChat(personOne, personTwo);
+
+        contactRepository.save(contact);
+        chatRepository.save(newPrivateChat);
+
+        return ResponseEntity.ok(ContactDTO.toDTO(contact, DTO.ConvertLevel.HIGH));
+    }
+
+    @Transactional
+    public Contact createContact(PersonPrincipal principal, Long personTwoId) {
+        Person personOne = personRepository.findById(principal.getId()).orElseThrow(() -> new UsernameNotFoundException(principal.getName()));
+        Person personTwo = personRepository.findById(personTwoId).orElseThrow(() -> new UsernameNotFoundException(principal.getName()));
+        Contact contact = new Contact(personOne, personTwo);
 
         PrivateChat newPrivateChat = new PrivateChat(personOne, personTwo);
 
-        personRepository.save(personOne);
-        personRepository.save(personTwo);
-
         contactRepository.save(contact);
-
         chatRepository.save(newPrivateChat);
 
-        return ResponseEntity.ok(ChatDTO.toDTO(newPrivateChat, DTO.ConvertLevel.HIGH).orElse(null));
+        return contact;
     }
 
     @Transactional(readOnly = true)

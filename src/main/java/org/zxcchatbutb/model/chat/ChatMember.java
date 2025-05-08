@@ -39,6 +39,17 @@ public class ChatMember {
         this.isMute = false;
     }
 
+    public ChatMember(Person person, AbstractChat chat) {
+        this.person = person;
+        this.chat = chat;
+        this.joinedAt = LocalDateTime.now();
+        this.isMute = false;
+
+        if (chat instanceof PrivateChat) {
+            this.role = ChatRole.ADMIN;
+        }
+    }
+
     public enum ChatRole {
         USER, ADMIN
     }

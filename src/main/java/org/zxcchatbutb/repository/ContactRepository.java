@@ -6,6 +6,7 @@ import org.springframework.data.repository.query.Param;
 import org.zxcchatbutb.model.chat.Contact;
 import org.zxcchatbutb.model.user.Person;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ContactRepository extends JpaRepository<Contact, Long> {
@@ -15,4 +16,9 @@ public interface ContactRepository extends JpaRepository<Contact, Long> {
     Optional<Contact> findContactBetweenPersons(
             @Param("person1") Person person1,
             @Param("person2") Person person2
-    );}
+    );
+
+    @Query("SELECT c FROM Contact c WHERE c.personOne = :person OR c.personTwo = :person")
+    List<Contact> findAllContactsByPerson(@Param("person") Person person);
+}
+

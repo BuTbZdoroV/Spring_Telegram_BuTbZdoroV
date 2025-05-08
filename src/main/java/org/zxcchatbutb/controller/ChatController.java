@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.zxcchatbutb.config.authinfo.PersonPrincipal;
 import org.zxcchatbutb.model.DTO.AttachmentDTO;
+import org.zxcchatbutb.model.DTO.ChatMemberDTO;
 import org.zxcchatbutb.service.ChatService;
 
 import java.security.Principal;
@@ -27,7 +28,7 @@ public class ChatController {
 
     @PostMapping("/createPrivateChat/{person2Id}")
     public ResponseEntity<?> createPrivateChat(@AuthenticationPrincipal PersonPrincipal person, @PathVariable Long person2Id) {
-        return chatService.createPrivateChat(person, person2Id);
+        return chatService.getOrCreatePrivateChat(person, person2Id);
     }
 
     @GetMapping("/getChats")
@@ -38,6 +39,11 @@ public class ChatController {
     @PatchMapping("/{chatId}/addMemberToChat/{person2Id}/")
     public ResponseEntity<?> addMemberToChat(@AuthenticationPrincipal PersonPrincipal person, @PathVariable Long person2Id, @PathVariable Long chatId) {
         return chatService.addMemberToChat(person, person2Id, chatId);
+    }
+
+    @GetMapping("/{chatId}/members")
+    public ResponseEntity<List<ChatMemberDTO>> getMembersInChat(@AuthenticationPrincipal PersonPrincipal person, @PathVariable Long chatId) {
+        return chatService.getChatMembers(person, chatId);
     }
 
     @PostMapping("/upload")

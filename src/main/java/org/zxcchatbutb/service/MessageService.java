@@ -2,12 +2,12 @@ package org.zxcchatbutb.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.zxcchatbutb.config.authinfo.PersonPrincipal;
+import org.zxcchatbutb.controller.ContactService;
 import org.zxcchatbutb.model.DTO.*;
 import org.zxcchatbutb.model.chat.*;
 import org.zxcchatbutb.model.user.Person;
@@ -16,6 +16,7 @@ import org.zxcchatbutb.repository.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 @Slf4j
 @Service
@@ -24,12 +25,12 @@ public class MessageService {
 
     private final MessageRepository messageRepository;
     private final PersonRepository personRepository;
-    private final SimpMessagingTemplate rabbitTemplate;
-    private static final List<String> BAD_WORDS = List.of("хуй", "пизда", "ебан", "бля", "сука");
+    private final SimpMessagingTemplate messageTemplate;
     private final ChatMemberRepository chatMemberRepository;
     private final ChatRepository chatRepository;
     private final AttachmentRepository attachmentRepository;
     private final ContactRepository contactRepository;
+    private final ContactService contactService;
 
 
     @Transactional
@@ -47,13 +48,13 @@ public class MessageService {
         if (abstractChat instanceof PrivateChat privateChat) {
             Person receiver = personRepository.findById(privateChat.getPartner(principal).getId()).orElseThrow();
 
-            Contact contact = contactRepository.findContactBetweenPersons(sender, receiver).orElseThrow(() -> new RuntimeException("Contact not found"));
+            Contact contact = contactService.getOrCreateContact(principal, receiver.getId());
 
             Contact.ContactPermissions contactPermissions = contact.getPermissionsFor(receiver);
 
             if (!contactPermissions.isCanSendMessages()) {
                 System.out.println("Пользователь " + receiver.getName() + " запретил отправлять пользователю " + sender.getName() + " сообщения");
-                rabbitTemplate.convertAndSend(new ErrorMessageDTO(ErrorMessageDTO.ErrorCode.MESSAGE_BLOCK,
+                messageTemplate.convertAndSend(new ErrorMessageDTO(ErrorMessageDTO.ErrorCode.MESSAGE_BLOCK,
                         "Пользователь " + receiver.getName() + " запретил отправлять пользователю " + sender.getName() + " сообщения",
                         LocalDateTime.now()));
             }
@@ -71,31 +72,18 @@ public class MessageService {
         attachmentRepository.saveAll(attachments);
         messageRepository.save(newMessage);
 
-        return ResponseEntity.ok(MessageDTO.toDTO(newMessage, MessageDTO.ConvertLevel.HIGH).orElse(null));
+        MessageDTO messageDTO = MessageDTO.toDTO(newMessage, MessageDTO.ConvertLevel.HIGH).orElse(null);
+
+        if (messageDTO != null) {
+            messageTemplate.convertAndSend("/topic/chat." + abstractChat.getId(), messageDTO);
+        }
+
+        return ResponseEntity.ok(messageDTO);
     }
-
-    private boolean containsBadWords(String text) {
-        String lowerText = text.toLowerCase();
-        return BAD_WORDS.stream().anyMatch(lowerText::contains);
-    }
-
-/*    private void sendWarningToUser(PersonPrincipal user) {
-        Message warning = new Message();
-        warning.setType(Message.MessageType.SYSTEM);
-        warning.setContent("Ваше сообщение содержит запрещённые слова. Пожалуйста, соблюдайте правила чата.");
-        warning.setSendAt(LocalDateTime.now());
-
-        messagingTemplate.convertAndSendToUser(
-                user.getUsername(),
-                "/queue/warnings",
-                MessageDTO.toDTO(warning, MessageDTO.ConvertLevel.HIGH)
-        );
-
-    }*/
 
     @Transactional
-    public MessageDTO handleUserJoin(Long chatId, PersonPrincipal principal) {
-        Message notification = new Message();
+    public ResponseEntity<?> handleUserJoin(Long chatId, PersonPrincipal principal) {
+   /*     Message notification = new Message();
         notification.setContent(principal.getUsername() + " присоединился к чату");
         notification.setType(Message.MessageType.SYSTEM);
         notification.setSendAt(LocalDateTime.now());
@@ -104,14 +92,16 @@ public class MessageService {
         notification.setAttachments(new ArrayList<>());
         notification.setStatus(Message.Status.SENDING);
 
-        Message savedMessage = messageRepository.save(notification);
+        Message savedMessage = messageRepository.save(notification);*/
 
+        log.atInfo().log("Пользователь " + principal.getUsername() + "Присоединился к чату + " + chatId);
 
-        return MessageDTO.toDTO(savedMessage, DTO.ConvertLevel.HIGH).orElse(null);
+      //  return ResponseEntity.ok(MessageDTO.toDTO(savedMessage, DTO.ConvertLevel.HIGH).orElse(null));
+        return null;
     }
 
     public void handleMessageStatus(StatusUpdateDTO status) {
-        rabbitTemplate.convertAndSend(
+        messageTemplate.convertAndSend(
                 "/topic/chat.status." + status.getMessageId(),
                 status
         );

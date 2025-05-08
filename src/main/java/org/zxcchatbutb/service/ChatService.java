@@ -7,8 +7,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.zxcchatbutb.config.authinfo.PersonPrincipal;
 import org.zxcchatbutb.model.DTO.ChatDTO;
+import org.zxcchatbutb.model.DTO.ChatMemberDTO;
 import org.zxcchatbutb.model.DTO.DTO;
-import org.zxcchatbutb.model.DTO.PersonDTO;
 import org.zxcchatbutb.model.chat.AbstractChat;
 import org.zxcchatbutb.model.chat.ChatMember;
 import org.zxcchatbutb.model.chat.PrivateChat;
@@ -20,7 +20,8 @@ import org.zxcchatbutb.repository.MessageRepository;
 import org.zxcchatbutb.repository.PersonRepository;
 
 import java.util.List;
-import java.util.logging.Logger;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -54,23 +55,32 @@ public class ChatService {
     }
 
     @Transactional
-    public ResponseEntity<?> createPrivateChat(PersonPrincipal person1Principal, Long person2ID) {
+    public ResponseEntity<?> getOrCreatePrivateChat(PersonPrincipal person1Principal, Long person2Id) {
+        try {
+            Person person1 = personRepository.findById(person1Principal.getId())
+                    .orElseThrow(() -> new EntityNotFoundException("User 1 not found"));
+            Person person2 = personRepository.findById(person2Id)
+                    .orElseThrow(() -> new EntityNotFoundException("User 2 not found"));
 
-        Person person1 = personRepository.findById(person1Principal.getId()).orElse(null);
-        Person person2 = personRepository.findById(person2ID).orElse(null);
-
-        if (person1 == null || person2 == null) {
-            return ResponseEntity.badRequest().build();
+            PrivateChat privateChat = getOrCreatePrivateChat(person1, person2);
+            return ResponseEntity.ok(ChatDTO.toDTO(privateChat, DTO.ConvertLevel.HIGH));
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
-
-        PrivateChat newPrivateChat = createPrivateChat(person1, person2);
-
-        chatRepository.save(newPrivateChat);
-        return ResponseEntity.ok(ChatDTO.toDTO(newPrivateChat, DTO.ConvertLevel.HIGH));
     }
 
-    private PrivateChat createPrivateChat(Person user1, Person user2) {
-        return new PrivateChat(user1, user2);
+    private PrivateChat getOrCreatePrivateChat(Person user1, Person user2) {
+        return chatRepository.findChatBetweenUsers(user1.getId(), user2.getId())
+                .orElseGet(() -> {
+                    PrivateChat newChat = new PrivateChat();
+
+                    ChatMember member1 = new ChatMember(user1, newChat, ChatMember.ChatRole.ADMIN);
+                    ChatMember member2 = new ChatMember(user2, newChat, ChatMember.ChatRole.ADMIN);
+
+                    newChat.setMembers(Set.of(member1, member2));
+
+                    return chatRepository.save(newChat);
+                });
     }
 
     @Transactional(readOnly = true)
@@ -110,20 +120,26 @@ public class ChatService {
 
 
     @Transactional(readOnly = true)
-    public ResponseEntity<?> getChatMembers(Long chatId) {
-        try {
-            PublicChat chat = (PublicChat) chatRepository.findById(chatId)
-                    .orElseThrow(() -> new EntityNotFoundException("Chat not found"));
+    public ResponseEntity<List<ChatMemberDTO>> getChatMembers(PersonPrincipal principal, Long chatId) {
 
-            List<ChatMember> members = chatMemberRepository.findChatMemberByChat(chat);
-            List<PersonDTO> memberDTOs = members.stream()
-                    .map(m -> PersonDTO.toDTO(m.getPerson(), DTO.ConvertLevel.MEDIUM).orElse(null))
-                    .collect(Collectors.toList());
-
-            return ResponseEntity.ok(memberDTOs);
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(e.getMessage());
+        if (principal == null || chatId == null) {
+            return ResponseEntity.badRequest().build();
         }
+
+        AbstractChat chat = chatRepository.findById(chatId)
+                .orElseThrow(() -> new EntityNotFoundException("Chat not found"));
+        Person currentPerson = personRepository.findById(principal.getId())
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+        if (!chat.personInMemberChat(currentPerson)) return ResponseEntity.badRequest().build();
+
+        List<ChatMemberDTO> members = chat.getMembers().stream()
+                .filter(chatMember -> !chatMember.getPerson().equals(currentPerson))
+                .map(chatMember -> ChatMemberDTO.toDTO(chatMember, DTO.ConvertLevel.HIGH).orElse(null))
+                .filter(Objects::nonNull)
+                .toList();
+
+        return ResponseEntity.ok(members);
     }
 
 }

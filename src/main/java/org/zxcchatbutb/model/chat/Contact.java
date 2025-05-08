@@ -13,6 +13,7 @@ import org.zxcchatbutb.model.user.Person;
 public class Contact {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @ManyToOne
     @JoinColumn(name = "person_one_id")
@@ -22,8 +23,25 @@ public class Contact {
     private Person personTwo;
 
     @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "canSendMessages", column = @Column(name = "person_one_can_send")),
+            @AttributeOverride(name = "canCall", column = @Column(name = "person_one_can_call")),
+            @AttributeOverride(name = "canAddToChats", column = @Column(name = "person_one_can_add")),
+            @AttributeOverride(name = "canSeeAvatar", column = @Column(name = "person_one_can_see_avatar")),
+            @AttributeOverride(name = "canSeePhoneNumber", column = @Column(name = "person_one_can_see_phone")),
+            @AttributeOverride(name = "canSeeLastSeen", column = @Column(name = "person_one_can_see_last_seen"))
+    })
     private ContactPermissions contactPermissionsPersonOne;
+
     @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "canSendMessages", column = @Column(name = "person_two_can_send")),
+            @AttributeOverride(name = "canCall", column = @Column(name = "person_two_can_call")),
+            @AttributeOverride(name = "canAddToChats", column = @Column(name = "person_two_can_add")),
+            @AttributeOverride(name = "canSeeAvatar", column = @Column(name = "person_two_can_see_avatar")),
+            @AttributeOverride(name = "canSeePhoneNumber", column = @Column(name = "person_two_can_see_phone")),
+            @AttributeOverride(name = "canSeeLastSeen", column = @Column(name = "person_two_can_see_last_seen"))
+    })
     private ContactPermissions contactPermissionsPersonTwo;
 
     public Contact(Person personOne, Person personTwo) {
@@ -40,9 +58,9 @@ public class Contact {
     }
 
     public ContactPermissions getPermissionsFor(Person person) {
-        if (person.equals(personOne)) {
+        if (person.getId().equals(personOne.getId())) {
             return contactPermissionsPersonOne;
-        } else if (person.equals(personTwo)) {
+        } else if (person.getId().equals(personTwo.getId())) {
             return contactPermissionsPersonTwo;
         }
         throw new IllegalArgumentException("Person not part of this contact");

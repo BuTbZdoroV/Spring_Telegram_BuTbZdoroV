@@ -13,8 +13,14 @@ import org.zxcchatbutb.model.user.Person;
 public class PrivateChat extends AbstractChat {
 
     public PrivateChat(Person person1, Person person2) {
-        this.getMembers().add(new ChatMember(person1, this, ChatMember.ChatRole.ADMIN));
-        this.getMembers().add(new ChatMember(person2, this, ChatMember.ChatRole.ADMIN));
+        ChatMember member1 = new ChatMember(person1, this, ChatMember.ChatRole.ADMIN);
+        ChatMember member2 = new ChatMember(person2, this, ChatMember.ChatRole.ADMIN);
+
+        this.getMembers().add(member1);
+        this.getMembers().add(member2);
+
+        person1.getChats().add(member1);
+        person2.getChats().add(member2);
         this.setChatName(String.format("%s & %s", person1.getName(), person2.getName()));
     }
 

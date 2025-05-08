@@ -34,11 +34,16 @@ public class MessageController {
         this.messageService = messageService;
     }
 
-    @MessageMapping("/chat/{chatId}/send")
-    @SendTo("/topic/chat.{chatId}")
+    @MessageMapping("/chat.{chatId}.send")
     public ResponseEntity<?> send(@Valid @Payload MessageDTO message, Principal principal) {
         PersonPrincipal userPrincipal = (PersonPrincipal) ((Authentication) principal).getPrincipal();
         return messageService.send(message, userPrincipal);
+    }
+
+    @MessageMapping("/chat/{chatId}/userJoin")
+    public void handleUserJoin(@DestinationVariable Long chatId, Principal principal) {
+        PersonPrincipal userPrincipal = (PersonPrincipal) ((Authentication) principal).getPrincipal();
+        messageService.handleUserJoin(chatId, userPrincipal);
     }
 
     @MessageMapping("/chat.status")

@@ -40,9 +40,6 @@ public class Person {
     @OneToMany(mappedBy = "person")
     private Set<ChatMember> chats;
 
-    @OneToMany(mappedBy = "contact")
-    private List<Contact> contacts;
-
     @Embedded
     private DefaultContactPolicy defaultContactPolicy;
 
@@ -51,6 +48,7 @@ public class Person {
 
     public Person() {
         role = PersonRole.USER;
+        defaultContactPolicy = new DefaultContactPolicy();
     }
 
     public enum AuthProvider {
